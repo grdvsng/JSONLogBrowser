@@ -1,0 +1,12 @@
+{
+    "width":             600,
+    "height":            400, 
+    "title":             "JSON-Log-Browser",
+    "resizable":         false,
+    "controllers_path":  "./controller.py",
+
+    "menu":  {
+        "cls": "TopPanel",
+        "controller": "MENU"
+    }
+}

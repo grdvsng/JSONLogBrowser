@@ -2,107 +2,174 @@ import tkinter
 import ctypes
 import platform
 
-
-MENU_ELEMENTS = ["TopPanel"]
-
-
-class Window:
-    
-    @staticmethod
-    def _getSizeWindows():
-        user32 = ctypes.windll.user32
-        
-        return {
-            "width":  user32.GetSystemMetrics(0), 
-            "height": user32.GetSystemMetrics(1)
-        }
-    
-    @staticmethod
-    def _getSizeUNIX():
-        root = tkinter.Tk()
-        
-        return {
-            "width":  root.winfo_screenwidth(), 
-            "height": root.winfo_screenheight()
-        }
-    
-    @staticmethod
-    def getSize():
-        if (platform.system() == 'Windows'):
-            return Window._getSizeWindows()
-        else:
-            return Window._getSizeUNIX()
+from os.path import abspath, join, dirname
 
 
-    @staticmethod
-    def getWidth():
-        return Window.getSize()["width"]
+class Controller:
+    events = {
+        'left_click':          '<Button-1>',
+        'midle_click':         '<Button-2>',
+        'right_click':         '<Button-3>',
+        'scroll_up':           '<Button-4>',
+        'scroll_down':         '<Button-5>',
+        'db_right_click':      '<Double-Button-3',
+        'db_midle_click':      '<Double-Button-2>',
+        'db_left_click':       '<<Double-Button-1>',
+        'move_with_left':      '<B1-Motion>',
+        'move_with_midle':     '<B2-Motion>',
+        'move_with_right':     '<B3-Motion>',
+        'left_click_release':  '<ButtonRelease-1>',
+        'midle_click_release': '<ButtonRelease-2>',
+        'right_click_release': '<ButtonRelease-3>',
+        'mousein':             '<Enter>',
+        'mouseleave':          '<Leave>',
+        'focus':               '<FocusIn>',
+        'focus_leave':         '<FocusOut>',
+        'onspecialkeys':       '<Return>',
+        'keydown':             '<Key>',
+        'shift_up':            '<Shift-Up>',
+        'resize':              '<Configure>'
+    }
 
-    @staticmethod
-    def getHeight():
-        return Window.getSize()["height"]
+    listeners = None
 
+    def __init__(self, master):
+        self.listeners = self.setMapOfEvenetHandler()
+        self.master    = master
 
-class EventListener:
+        self.addEventListeners()
 
-    def __init__(self, event, action):
-        self.event  = event
-        self.action = action
+    def addEventListeners(self):
+        for event, action in self.listeners.items():
+            self.addEventListener(event, action)
 
-
-class BasicElement:
-    compileParams = {}
-    parentNode    = None
-    packParams    = {}
-    listeners     = [{}]
-    children      = []
-    items         = []
-    dom           = None
-    tag           = None
-
-    def __init__(self, parentNode):
-        self.parentNode = parentNode
-    
     def addEventListener(self, event, action):
-        self.dom.bind(event, action)
+        self.master.dom.bind(event, action)
 
-    def appendChild(self, child):
-        child.parentNode = self
-
-        self.children.append(child)
-        child.pack()
-
-    def _compile(self):
-        if (self.parentNode):
-            self.dom = self.tag(master=self.parentNode.dom, **self.compileParams)
-        else:
-            self.dom = self.tag(**self.compileParams)
-
-        self._compile = None
-
-    def pack(self):
-        self.dom.pack(**self.packParams)
+    def setMapOfEvenetHandler(self):
+        return {self.events[prop]: self.__getattribute__(prop)
+            for prop in dir(self)
+            if prop in self.events and callable(self.__getattribute__(prop))
+        }
 
 
-class MainFrame(BasicElement):
-    tag           = tkinter.Frame
-    panel         = None
-    wizards       = []
-    compileParams = {
-        "width":  Window.getWidth(), 
-        "height": Window.getHeight()
-    }
 
-    def __init__(self, parentNode):
-        self.items = [self.panel] if self.panel.__name__ in MENU_ELEMENTS else []
+class Element(object):
+    parentNode          = None
+    dom                 = None
+    items               = None
+    packParams          = None
+    gridParams          = None
+    bg                  = None
+    cursor              = None
+    highlightbackground = None
+    highlightcolor      = None
+    highlightthickness  = None
+    relief	            = None
+    tk_type             = None
+    column              = None
+    columnspan          = None
+    in_                 = None
+    ipadx               = None
+    ipady               = None
+    padx                = None
+    pady                = None
+    listeners           = None
+    row                 = None
+    rowspan             = None
+    sticky              = None
+    controller          = None
+    width               = 0
+    height              = 0
+    gridParams          = [
+        "column", "columnspan",
+        "in_", "ipadx", "ipady"
+        "padx", "pady", "row"
+        "rowspan", "sticky", "row"
+    ]
 
-        super().__init__(parentNode)
+    def __init__(self, compileParams, parentNode=None):
+        for att, value in compileParams.items(): 
+            if hasattr(self, att):
+                self.__setattr__(att, value)
+
+        self.parentNode = parentNode
+
+    def getPackParams(self):
+        return {k : self.__getattribute__(k)
+            for  k in self.packParams
+            if hasattr(self, k)
+        }
+
+    def getGridParams(self):
+        return {k : self.__getattribute__(k)
+            for  k in self.gridParams
+            if hasattr(self, k) and not k is None
+        }
+
+    def render(self):
+        self.dom.grid(**self.getGridParams())
+
+    def getGeometry(self):
+        return "%sx%s" % (self.width, self.height)
+
+    def setController(self, controller):
+        self.controller = controller(self)
 
 
-class TopPanel(BasicElement):
-    tag           = tkinter.Frame
-    compileParams = {
-        "bg":     "#ff5733",
-        "width":  Window.getWidth(), 
-        "height": 40
-    }
+class MainFrame(Element):
+    width      = 100
+    height     = 100
+    title      = 'MainFrame'
+    wizards    = []
+    tk_type    = tkinter.Tk
+    menu       = None
+    ignored    = ['items']
+    resizable  = None
+    
+    def __init__(self, compileParams, parentNode=None):
+        if "menu" in compileParams:
+            self.items = [compileParams["menu"]]
+
+        super().__init__(compileParams)
+
+    def render(self):
+        self._setResizeble()
+        self.dom.title(self.title)
+        self.dom.geometry(self.getGeometry())
+        self.dom.mainloop()
+        
+    def _setResizeble(self):
+        if not self.resizable is None:
+            if (isinstance(self.resizable, list)):
+                self.dom.resizable(self.resizable[0], self.resizable[1])
+            elif (not self.resizable):
+                self.dom.resizable(False, False)
+
+
+class Menu(Element):
+    tk_type    = tkinter.Frame
+    packParams = ["width", "height", "bg"]
+
+    def __init__(self, compileParams, parentNode):
+        super().__init__(compileParams, parentNode)
+
+
+class TopPanel(Menu):
+    height    = 30
+    bg        = "cornflowerblue"
+    row       = 0
+    column    = 10
+    label     = None
+
+    def __init__(self, compileParams, parentNode):
+        self.width     = parentNode.width
+        #self.listeners = []
+
+        super().__init__(compileParams, parentNode)
+
+
+BASIC_TYPES = {
+    "MainFrame": MainFrame,
+    "TopPanel":  TopPanel
+}
